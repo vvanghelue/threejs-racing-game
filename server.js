@@ -16,3 +16,5 @@ app.get('/editor', (req, res) => {
 })
 
 app.listen(7777)
+
+console.log('http://localhost:7777')
