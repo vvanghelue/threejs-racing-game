@@ -84,7 +84,7 @@
 		orbitControl.maxPolarAngle = Math.PI;
 
 
-		let terrain = await ThreeHeightmap('/heightmap2_big.png')
+		let terrain = await ThreeHeightmap(['/_path.svg', '/_terrain.png', '/_path.svg'], 130)
 		terrain.castShadow = true;
 		terrain.receiveShadow = true;
 
@@ -92,7 +92,21 @@
 		terrain.position.set(10, 0, 10)
 
 
-		let road = (() => {
+
+		let road = await (async () => {
+
+			let roadMesh = await ThreeHeightmap(['/_terrain.png'], 30)
+
+			let material = new THREE.MeshStandardMaterial( { color: 0xccccaa} );
+			// let material = new THREE.MeshStandardMaterial( { color: 0xffffff} );
+			material.roughness = .9
+			material.metalness = .5
+			
+			roadMesh.material = material
+			return roadMesh;
+
+			/*
+
 			let geometry = new THREE.PlaneGeometry(100, 100, 1, 1);
 
 			let material = new THREE.MeshStandardMaterial( { color: 0xccccaa} );
@@ -105,11 +119,14 @@
 			let plane = new THREE.Mesh( geometry, material );
 			plane.rotateOnAxis(new THREE.Vector3(1, 0, 0), -1 * Math.PI/2);
 			return plane
+			*/
 		})()
+
+
 		road.castShadow = false;
 		road.receiveShadow = true;
 		scene.add(road)
-		road.position.set(10, 13, 10)
+		road.position.set(10, -1.5, 10)
 
 
 

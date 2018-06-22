@@ -1,0 +1,14 @@
+{
+  "name": "editor",
+  "version": "1.0.0",
+  "description": "",
+  "main": "editor.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "svgedit": "^3.0.0-alpha.4"
+  }
+}
