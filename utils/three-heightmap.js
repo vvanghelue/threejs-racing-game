@@ -32,25 +32,26 @@ const resizeCanvas = (img, canvas, context) => {
 }
 
 
-function getHeightData(layers, scale, segments) {
+function getHeightData(layers, segments, scale = 1) {
 
 
-	const width = layers[0].width
-	const height = layers[0].height
+	const width = layers[0].image.width
+	const height = layers[0].image.height
 
 	// StackBlur.image(roadImg, targetCanvas, radius, blurAlphaChannel);
 
 	let factor = (segments + 1) / width
-  
-    if (scale == undefined) scale=1;
+	console.log(`segments : ${segments} with factor ${factor}`)
   
     var canvas = document.createElement( 'canvas' );
     canvas.width = width * factor;
     canvas.height = height * factor;
     var context = canvas.getContext( '2d' );
-    // context.filter = 'blur(3px)';
+    // context.filter = 'blur(1px)';
 
-    context.fillStyle = "#aaaaaa"
+    // context.imageSmoothingEnabled = false
+
+    context.fillStyle = "#bbb"
 	context.fillRect(0,0, width * factor, height * factor)
 	
 	document.querySelector('.heightmap-container').appendChild(canvas)
@@ -63,8 +64,8 @@ function getHeightData(layers, scale, segments) {
     // context.drawImage(roadImg, 0, 0, width * factor, height * factor)
 
     for (const layer of layers) {
-	    context.globalAlpha = 1
-	    context.drawImage(layer, 0, 0, width * factor, height * factor)
+	    context.globalAlpha = layer.opacity
+	    context.drawImage(layer.image, 0, 0, width * factor, height * factor)
 	}
  
     for ( var i = 0; i < size; i ++ ) {
@@ -72,11 +73,24 @@ function getHeightData(layers, scale, segments) {
     }
 
     // resizeCanvas(img, )
- 
-    var imgd = context.getImageData(0, 0, width * factor, height * factor);
+
+    // context.webkitImageSmoothingEnabled = false
+    // context.imageSmoothingEnabled = true
+
+    var imgd = context.getImageData(0, 0, width * factor, height * factor)
+
+    /*
+	var canvas2 = document.createElement( 'canvas' );
+	canvas2.width = width * factor;
+	canvas2.height = height * factor;
+	var context2 = canvas2.getContext( '2d' );
+	document.querySelector('.heightmap-container').appendChild(canvas2)
+	context2.putImageData(imgd, 0, 0)
+	*/
+
     var pix = imgd.data;
  
- 	console.log(pix.length)
+ 	// console.log(pix.length)
 
     var j=0;
     for (var i = 0; i< pix.length; i += 4) {
@@ -98,29 +112,36 @@ function getHeightData(layers, scale, segments) {
 
 (() => {
 
-	ThreeHeightmap = async (layers, size = 310) => {
+	ThreeHeightmap = async (layers, size = 400, scale = 10) => {
 
 		let layersImages = []
 		for (const layerSource of layers) {
-			let layerImage = await loadImage(layerSource)
-			layersImages.push(layerImage)
+			let layerImage = await loadImage(layerSource.image)
+			layersImages.push({image: layerImage, opacity: layerSource.opacity})
 		}
 
 
 		//get height data from img
-		var data = getHeightData(layersImages, 1.8, size);
+		var data = getHeightData(layersImages, size, scale);
 
 		// plane
 		var geometry = new THREE.PlaneGeometry(100, 100, size, size);
 		// var texture = THREE.ImageUtils.loadTexture( 'images/heightmap2.png' );
 		//var material = new THREE.MeshStandardMaterial({color: '#aa0022', /*wireframe: true*/} /*{ map: texture }*/ );
-		var material = new THREE.MeshStandardMaterial( { color: 0xcfff65 , /*side: THREE.DoubleSide*/} );
+		var material = new THREE.MeshStandardMaterial({
+			color: 0xcfff65 , 
+			// side: THREE.DoubleSide
+			// shading: THREE.FlatShading
+		});
+		// material = new THREE.MeshNormalMaterial()
 		material.roughness = 1
 		material.metalness = .3
 		// material.flatShading = true;
 		plane = new THREE.Mesh( geometry, material );
 
-		plane.rotateOnAxis(new THREE.Vector3(1, 0, 0), -1 * Math.PI/2);
+
+		//plane.rotateOnAxis(new THREE.Vector3(1, 0, 0), -1 * Math.PI/2);
+		//plane.updateMatrixWorld()
 		// plane.rotateOnAxis(new THREE.Vector3(0, 0, 1), Math.PI/2);
 
 
@@ -131,6 +152,11 @@ function getHeightData(layers, scale, segments) {
 
 			// plane.geometry.vertices[i].z = i
 		}
+
+
+		geometry.rotateX(-1 * Math.PI/2)
+		plane.updateMatrixWorld()
+
 
 		plane.geometry.mergeVertices();
 		plane.geometry.verticesNeedUpdate	= true

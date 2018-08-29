@@ -1,11 +1,69 @@
+const getCheckpoints = async (svgUrl) => {
+	const svgData = await (await fetch(svgUrl)).text()
 
+	//console.log(svgData)
+	const svgElement = createElement(svgData)
+	const path = svgElement.querySelector('path')
+	const length = path.getTotalLength()
+
+	const step = length / 170
+	let points = []
+
+	console.log(path.getPointAtLength(0))
+	console.log(path.getPointAtLength(100))
+	console.log(path.getPointAtLength(length))
+
+	let at = 0
+	while (at < length) {
+		const point = path.getPointAtLength(at)
+		points.push({
+			at: at,
+			point: { x: point.x, y: point.y }
+		})
+		at += step
+	}
+
+	return points
+}
+
+const addCheckpointsToScene = async (checkpointsCoordinates, roadMesh, scene) => {
+	const allCheckpoints = []
+	checkpointsCoordinates.forEach((checkpointCoord) => {
+		//console.log(checkpointCoord)
+		let checkpointMesh = new THREE.Mesh(new THREE.SphereGeometry(.2, 10, 10), new THREE.MeshStandardMaterial( { color: 0xff0000} ))
+
+		const checkpointPosition = new THREE.Vector3(
+			checkpointCoord.point.x / 3.98 - 50.25, 
+			30, 
+			checkpointCoord.point.y / 3.98 - 50.25
+		)
+
+		checkpointMesh.position.copy(checkpointPosition)
+		scene.add(checkpointMesh)
+
+		const raycaster = new THREE.Raycaster(
+			checkpointMesh.position,
+			new THREE.Vector3(0, -1, 0),
+			0,
+			2000
+		)
+
+		const intersects = raycaster.intersectObjects([
+			roadMesh
+		], true)
+
+		if (intersects[0]) {
+			checkpointMesh.position.copy(intersects[0].point)
+		}
+	})
+}
 
 (async () => {
 
 	var camera, orbitControl, transformControl, scene, renderer;
 
-	var postprocessing = { enabled: true }
-	// var postprocessing = { enabled: false }
+	var postprocessing = { enabled: false }
+	//var postprocessing = { enabled: true }
 	var effectComposer
 
 
@@ -20,6 +78,8 @@
 		ssaoPass.radius = 5
 		ssaoPass.aoClamp = 0.25
 		ssaoPass.lumInfluence = .9
+
+		// ssaoPass.enabled = false
 		// ssaoPass.lumInfluence = 1
 		// ssaoPass.size = new THREE.Vector2( 512, 512 )
 
@@ -27,6 +87,8 @@
 		effectComposer = new THREE.EffectComposer( renderer );
 		effectComposer.addPass( renderPass );
 		effectComposer.addPass( ssaoPass );
+
+
 		// effectComposer.addPass( renderPass );
 	}
 
@@ -34,8 +96,9 @@
 	let init = async () => {
 
 		scene = new THREE.Scene();
-		scene.background = new THREE.Color( 0x3fd8ff );
-		scene.fog = new THREE.FogExp2( 0xffffff, 0.01 );
+		// scene.background = new THREE.Color( 0x3fd8ff );
+		scene.background = new THREE.Color( 0x44eeff );
+		// scene.fog = new THREE.FogExp2( 0x44eeff, 0.01 );
 		// scene.fog = new THREE.FogExp2( 0x3fd8ff, 0.01 );
 
 		renderer = new THREE.WebGLRenderer( { /*antialias: true*/ } );
@@ -83,26 +146,86 @@
 
 		orbitControl.maxPolarAngle = Math.PI;
 
+		const roadPath = window.btoa(
+			unescape(
+				encodeURIComponent( randomCircuitGenerator() )
+			)
+		)
 
-		let terrain = await ThreeHeightmap(['/_path.svg', '/_terrain.png', '/_path.svg'], 130)
+		let terrain = await ThreeHeightmap([
+			// {
+			// 	opacity: .3,
+			// 	image: '/_path.svg'
+			// },
+
+
+			{
+				opacity: 1,
+				image: '/_terrain.png'
+			}, 
+			{
+				opacity: 1,
+				// image: '/_path.svg'
+				image: 'data:image/svg+xml;base64,' + roadPath
+			}
+		], 8 * 20, 2.5)
+
+		window.terrainMesh = terrain
+
+		// terrain.material.shading = THREE.FlatShading
+
+
+		
+		var subdivisions = 1
+		var modifier = new THREE.SubdivisionModifier( subdivisions )
+		modifier.modify( terrain.geometry, subdivisions )
+		terrain.geometry.computeFaceNormals()
+		terrain.geometry.computeVertexNormals()
+		
+		
+		// terrain.material.wireframe = true
+
 		terrain.castShadow = true;
 		terrain.receiveShadow = true;
 
 		scene.add(terrain)
-		terrain.position.set(10, 0, 10)
+		terrain.position.set(0, 0, 0)
 
-
+		/*
+		const terrainSlices = sliceTerrain(terrain, 8)
+		for (terrainSlice of terrainSlices) {
+			scene.add(terrainSlice)
+		}
+		*/
+		
 
 		let road = await (async () => {
 
-			let roadMesh = await ThreeHeightmap(['/_terrain.png'], 30)
+			let roadMesh = await ThreeHeightmap([
+				{
+					opacity: 1, 
+					image: '/_terrain.png'
+				}
+				//, 
+				// {
+				// 	opacity: .1,
+				// 	image: '/_path.svg'
+				// }
+			], 40, 2.6)
 
-			let material = new THREE.MeshStandardMaterial( { color: 0xccccaa} );
+			let material = new THREE.MeshStandardMaterial({ 
+				color: 0xccccaa,
+				// shading: THREE.FlatShading
+			});
 			// let material = new THREE.MeshStandardMaterial( { color: 0xffffff} );
 			material.roughness = .9
 			material.metalness = .5
+
 			
 			roadMesh.material = material
+
+			// roadMesh.material.wireframe = true
+
 			return roadMesh;
 
 			/*
@@ -125,25 +248,29 @@
 
 		road.castShadow = false;
 		road.receiveShadow = true;
+		road.position.set(0, -0, 0)
 		scene.add(road)
-		road.position.set(10, -1.5, 10)
 
-
+		setTimeout(async () => {
+			const checkpointsCoordinates = await getCheckpoints('/_path.svg')
+			await addCheckpointsToScene(checkpointsCoordinates, road, scene)
+		}, 1000)
 
 		var light = new THREE.AmbientLight( 0xffffff, 1 );
 		scene.add( light );
-
 
 		let targetMesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1, 1, 1))
 		targetMesh.position.set(10, -10, 10)
 		scene.add( targetMesh );
 
 		var directionalLight = new THREE.DirectionalLight( 0xffffff, 0.7 );
+		/*
 		directionalLight.castShadow = true;
 		directionalLight.shadow = new THREE.LightShadow( new THREE.PerspectiveCamera( 50, 1, 1200, 2500 ) );
 		directionalLight.shadow.bias = 0.0001;
 		directionalLight.shadow.mapSize.width = 512;
 		directionalLight.shadow.mapSize.height = 512;
+		*/
 
 		directionalLight.target = targetMesh
 		// directionalLight.target.position.set( 110, -10, 10 );
